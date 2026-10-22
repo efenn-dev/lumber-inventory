@@ -330,3 +330,7 @@ them freely, and let the Sold report correct you.
 - This runs on your LAN with no authentication. Don't expose it to the
   internet as-is.
 - Back up `lumber.db` and `static/uploads/` — that's your whole dataset.
+
+## License
+
+MIT. See [LICENSE](LICENSE). Copyright (c) 2026 Emmitt Fennessey.
