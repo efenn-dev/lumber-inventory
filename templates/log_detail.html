@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block title %}{{ log.species or 'Log' }} — {{ log.small_diameter_in }}" × {{ log.length_ft }}'{% endblock %}
+
+{% block content %}
+<div class="detail-head">
+  <h2>{{ log.species or 'Unidentified log' }}</h2>
+  <a class="secondary" href="{{ url_for('edit_log', log_id=log.id) }}">Edit</a>
+</div>
+
+{% if log.small_diameter_in %}
+  <p class="dims big">
+    {{ log.small_diameter_in }}" small end
+    {% if log.large_diameter_in %}/ {{ log.large_diameter_in }}" butt{% endif %}
+    &times; {{ log.length_ft }}'
+  </p>
+{% endif %}
+
+<div class="status-buttons">
+  {% for s in statuses %}
+    <form method="post" action="{{ url_for('set_log_status', log_id=log.id, new_status=s) }}">
+      <button class="chip {{ 'on' if log.status == s }}" type="submit">{{ s.replace('_', ' ') }}</button>
+    </form>
+  {% endfor %}
+</div>
+
+{% if plan %}
+<section>
+  <h3>Milling plan <span class="hint">— showing {{ selected_label }}</span></h3>
+
+  {% if comparison %}
+    <p class="alert alert-info">
+      <strong>Recommended: {{ comparison.options[comparison.recommended].label }}</strong>
+      {{ '(kiln assumed)' if kiln_assumed else '(air drying only — set "Assume kiln" in Settings)' }}
+      — {{ comparison.why }}
+    </p>
+  {% endif %}
+
+  <form method="get" class="inline-form">
+    <label class="inline">Cut
+      <select name="thickness" onchange="this.form.submit()">
+        <option value="rec" {{ 'selected' if choice == 'rec' }}>Recommended</option>
+        {% for t, label in [(1.0, '4/4'), (1.25, '5/4'), (1.5, '6/4'), (2.0, '8/4')] %}
+          <option value="{{ t }}" {{ 'selected' if choice != 'rec' and choice|float == t }}>{{ label }} ({{ t }}")</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="inline">Kerf
+      <input type="number" step="0.005" name="kerf" value="{{ kerf }}" onchange="this.form.submit()">
+    </label>
+  </form>
+
+  {% if comparison %}
+    <div class="table-wrap">
+      <table class="readings">
+        <thead><tr><th>Cut</th><th>Boards</th><th>Yield bf</th><th>Kiln-dried value</th><th></th></tr></thead>
+        <tbody>
+          {% for option in comparison.options %}
+            <tr class="{{ 'rec-row' if loop.index0 == comparison.recommended }}">
+              <td>{{ option.label }}</td>
+              <td>{{ option.plan.boards | length }}</td>
+              <td>{{ option.plan.yield_bf }}</td>
+              <td>{{ option.value_kiln | money if option.value_kiln is not none else '—' }}</td>
+              <td class="calc">{{ 'recommended' if loop.index0 == comparison.recommended }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="hint">
+      Yield barely moves with thickness — the value column is the argument. Thick boards carry a
+      per-bf premium only at slab width (10"+); narrow thick stock is leg material and priced like it.
+    </p>
+  {% endif %}
+
+  <div class="plan-grid">
+    <div>{{ plan_svg | safe }}</div>
+    <div>
+      <div class="totals">
+        <div><strong>{{ plan.yield_bf }}</strong><span>plan yield bf</span></div>
+        <div><strong>{{ plan.doyle_bf }}</strong><span>Doyle scale</span></div>
+        <div><strong>{{ plan.international_bf }}</strong><span>International &frac14;"</span></div>
+      </div>
+      {% if values %}
+        <p class="hint">
+          Board value at the {{ log.species }} rate:
+          <strong>{{ values.green | money }}</strong> green &middot;
+          <strong>{{ values.air_dried | money }}</strong> air dried &middot;
+          <strong>{{ values.kiln_dried | money }}</strong> kiln dried.
+          What the boards could list for — <em>not</em> what to pay for the log.
+        </p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="readings">
+      <thead><tr><th>#</th><th>Thick</th><th>Wide</th><th>Long</th><th>bd ft</th><th></th></tr></thead>
+      <tbody>
+        {% for board in plan.boards %}
+          <tr>
+            <td class="calc">{{ loop.index }}</td>
+            <td>{{ board.thickness_in }}"</td>
+            <td>{{ board.width_in }}"</td>
+            <td>{{ board.length_ft }}'</td>
+            <td>{{ board.board_feet }}</td>
+            <td class="calc">{% if board.contains_pith %}<span class="bad">pith — box the heart</span>{% endif %}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% for line in plan.advice %}
+    <p class="alert alert-info">{{ line }}</p>
+  {% endfor %}
+</section>
+{% else %}
+  <p class="hint">Add a small-end diameter and length to get a milling plan.</p>
+{% endif %}
+
+<section>
+  <h3>Photo analysis</h3>
+  {% if log.ai %}
+    {% if log.ai.species_candidates %}
+      <ul class="piece-list">
+        {% for c in log.ai.species_candidates %}
+          <li>
+            <strong>{{ c.name }}</strong>
+            <span class="hint">{{ (c.confidence * 100) | round | int }}% &middot; {{ c.why }}</span>
+            <form method="post" action="{{ url_for('accept_species', log_id=log.id) }}" class="inline-delete">
+              <input type="hidden" name="name" value="{{ c.name }}">
+              <button class="btn-quiet" type="submit">use this</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+    {% if log.ai.defects %}
+      <p class="hint"><strong>Defects spotted:</strong>
+        {% for d in log.ai.defects %}{{ d.type }} ({{ d.severity }}){{ ", " if not loop.last }}{% endfor %}
+      </p>
+    {% endif %}
+    {% if log.ai.milling_advice %}<p class="alert alert-info">{{ log.ai.milling_advice }}</p>{% endif %}
+    {% if log.ai.caution %}<p class="alert alert-warn">{{ log.ai.caution }}</p>{% endif %}
+    <p class="hint">Analyzed {{ log.ai_analyzed_at[:16].replace('T', ' ') }} via {{ log.ai._backend or 'vision backend' }}.
+      Suggestions only — nothing is applied until you click it.</p>
+  {% else %}
+    <p class="hint">No analysis yet.</p>
+  {% endif %}
+  <form method="post" action="{{ url_for('analyze_log', log_id=log.id) }}">
+    <button type="submit" {{ 'disabled' if not photos }}>Analyze newest photo</button>
+    <small class="hint">Runs on this machine's local model (first call after a model load can take 2–3 minutes),
+      then the configured cloud fallback.</small>
+  </form>
+</section>
+
+{% if log.notes %}
+  <section class="notes"><h3>Notes</h3><p>{{ log.notes }}</p></section>
+{% endif %}
+
+<section>
+  <h3>Photos</h3>
+  {% if photos %}
+    <ul class="gallery">
+      {% for photo in photos %}
+        <li>
+          <img src="{{ url_for('static', filename='uploads/' ~ photo.filename) }}" alt="">
+          <form method="post" action="{{ url_for('delete_log_photo', photo_id=photo.id) }}">
+            <button class="link-danger" type="submit">remove</button>
+          </form>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="hint">No photos yet — <a href="{{ url_for('edit_log', log_id=log.id) }}">add some</a>.</p>
+  {% endif %}
+</section>
+
+<form class="danger-zone" method="post" action="{{ url_for('delete_log', log_id=log.id) }}"
+      onsubmit="return confirm('Delete this log and its photos?')">
+  <button class="link-danger" type="submit">Delete this log</button>
+</form>
+{% endblock %}

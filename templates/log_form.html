@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit log' if log else 'Add log' }}{% endblock %}
+
+{% block content %}
+<h2>{{ 'Edit log' if log else 'Add a log' }}</h2>
+
+<form method="post" enctype="multipart/form-data" class="piece-form">
+  <label>Species <small>(leave blank and let the photo analysis suggest one)</small>
+    <input list="species-list" name="species" value="{{ log.species or '' if log else '' }}">
+    <datalist id="species-list">
+      {% for name in presets %}<option value="{{ name }}">{% endfor %}
+    </datalist>
+  </label>
+
+  <fieldset>
+    <legend>Dimensions</legend>
+    <div class="row">
+      <label>Small-end diameter <small>(inches, inside bark)</small>
+        <input type="number" step="0.5" name="small_diameter_in"
+               value="{{ log.small_diameter_in or '' if log else '' }}" required>
+      </label>
+      <label>Large-end diameter <small>(optional)</small>
+        <input type="number" step="0.5" name="large_diameter_in"
+               value="{{ log.large_diameter_in or '' if log else '' }}">
+      </label>
+      <label>Length <small>(FEET)</small>
+        <input type="number" step="0.5" name="length_ft"
+               value="{{ log.length_ft or '' if log else '' }}" required>
+      </label>
+    </div>
+    <p class="hint">
+      The small end governs every board width, so measure it, not the flare.
+      Log lengths are in feet; board lengths elsewhere in the app are inches.
+    </p>
+  </fieldset>
+
+  <label>Location
+    <input name="location" value="{{ log.location or '' if log else '' }}"
+           placeholder="e.g. north fence line, deck pile">
+  </label>
+
+  <label>Notes
+    <textarea name="notes" rows="3">{{ log.notes or '' if log else '' }}</textarea>
+  </label>
+
+  {% if log %}
+    <label>Status
+      <select name="status">
+        {% for s in ['on_deck', 'milled', 'skipped'] %}
+          <option value="{{ s }}" {{ 'selected' if log.status == s }}>{{ s.replace('_', ' ') }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  {% endif %}
+
+  <label>Photos
+    <input type="file" name="photos" accept="image/*" capture="environment" multiple>
+    <small>Bark, the end grain, and the whole log. End grain is what the analysis needs most.</small>
+  </label>
+
+  <button type="submit">Save</button>
+  <a class="secondary" href="{{ url_for('log_list') }}">Cancel</a>
+</form>
+{% endblock %}

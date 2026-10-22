@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#14110e">
+  <title>Fencerow Field</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/static/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="field">
+  <header class="topbar">
+    <span class="brand">Fencerow Field</span>
+    <nav>
+      <a href="/">Full app</a>
+      <span id="net-pill" class="pill">…</span>
+    </nav>
+  </header>
+
+  <nav class="field-tabs">
+    <button data-tab="log" class="on">Log</button>
+    <button data-tab="board">Board</button>
+    <button data-tab="kiln">Kiln</button>
+    <button data-tab="queue">Queue <span id="queue-count"></span></button>
+  </nav>
+
+  <main>
+    <!-- ================= LOG: calculator + capture ================= -->
+    <section id="tab-log" class="tab on">
+      <label>Photos <small>(bark + end grain; end grain matters most)</small>
+        <input id="log-photos" type="file" accept="image/*" capture="environment" multiple>
+      </label>
+      <label>Species <small>(or leave blank — analyze at home)</small>
+        <input id="log-species" list="species-list" placeholder="Pecan">
+        <datalist id="species-list">
+          {% for name in presets %}<option value="{{ name }}">{% endfor %}
+        </datalist>
+      </label>
+      <div class="row">
+        <label>Small end &empty; (in)
+          <input id="log-small" type="number" step="0.5" inputmode="decimal">
+        </label>
+        <label>Butt &empty; (in, opt.)
+          <input id="log-large" type="number" step="0.5" inputmode="decimal">
+        </label>
+        <label>Length (FEET)
+          <input id="log-length" type="number" step="0.5" inputmode="decimal">
+        </label>
+      </div>
+      <div class="row">
+        <label>Cut
+          <select id="log-thickness">
+            <option value="rec" selected>Recommended</option>
+            <option value="1">4/4 (1")</option>
+            <option value="1.25">5/4</option>
+            <option value="1.5">6/4</option>
+            <option value="2">8/4</option>
+          </select>
+        </label>
+        <label>Kerf (in)
+          <input id="log-kerf" type="number" step="0.005" value="0.0625" inputmode="decimal">
+        </label>
+      </div>
+
+      <div id="plan-out" class="plan-out"></div>
+
+      <label>Location
+        <input id="log-location" placeholder="north fence line">
+      </label>
+      <label>Notes
+        <textarea id="log-notes" rows="2"></textarea>
+      </label>
+      <button id="log-save" class="big">Save log to queue</button>
+    </section>
+
+    <!-- ================= BOARD: quick piece capture ================= -->
+    <section id="tab-board" class="tab">
+      <label>Photo
+        <input id="board-photos" type="file" accept="image/*" capture="environment" multiple>
+      </label>
+      <label>Species
+        <input id="board-species" list="species-list" placeholder="Pecan">
+      </label>
+      <div class="row">
+        <label>Length (in)
+          <input id="board-length" type="number" step="0.5" inputmode="decimal">
+        </label>
+        <label>Width (in)
+          <input id="board-width" type="number" step="0.25" inputmode="decimal">
+        </label>
+        <label>Thick (in)
+          <input id="board-thickness" type="number" step="0.125" value="1" inputmode="decimal">
+        </label>
+      </div>
+      <div class="row">
+        <label>Widest (live edge, opt.)
+          <input id="board-widthmax" type="number" step="0.25" inputmode="decimal">
+        </label>
+        <label>Status
+          <select id="board-status">
+            {% for s in statuses %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+          </select>
+        </label>
+        <label>Drying
+          <select id="board-method">
+            {% for m in dry_methods %}<option value="{{ m }}">{{ m }}</option>{% endfor %}
+          </select>
+        </label>
+      </div>
+      <label>Notes
+        <textarea id="board-notes" rows="2"></textarea>
+      </label>
+      <p class="hint">Board feet: <strong id="board-bf">—</strong></p>
+      <button id="board-save" class="big">Save board to queue</button>
+    </section>
+
+    <!-- ================= KILN: readings + device import ================= -->
+    <section id="tab-kiln" class="tab">
+      <div class="row">
+        <label>Temp &deg;F
+          <input id="k-temp" type="number" step="0.1" inputmode="decimal">
+        </label>
+        <label>RH %
+          <input id="k-rh" type="number" step="0.1" inputmode="decimal">
+        </label>
+        <label>Wood MC %
+          <input id="k-mc" type="number" step="0.1" inputmode="decimal">
+        </label>
+      </div>
+      <p class="hint">Timestamped now, automatically. Wood MC from the handheld meter is the
+        reading that calibrates the drying model — worth the ten seconds.</p>
+      <button id="k-save" class="big">Save reading to queue</button>
+
+      <h3>Import from the logger</h3>
+      <p class="hint">Join the sensor's wifi (KILN-SENSOR) first, then pull its CSV. It queues
+        like everything else and uploads when you're back in signal.</p>
+      <div class="row">
+        <label>Device URL
+          <input id="k-device-url" value="http://192.168.4.1/log.csv">
+        </label>
+      </div>
+      <button id="k-import" class="big">Pull CSV from device</button>
+      <label>…or pick the CSV off an SD card
+        <input id="k-csv-file" type="file" accept=".csv,.txt,text/csv">
+      </label>
+    </section>
+
+    <!-- ================= QUEUE ================= -->
+    <section id="tab-queue" class="tab">
+      <div class="row">
+        <button id="sync-now" class="big">Sync now</button>
+      </div>
+      <ul id="queue-list" class="piece-list"></ul>
+      <p id="sync-status" class="hint"></p>
+
+      <h3>Settings</h3>
+      <label>API token <small>(only if LUMBER_KILN_TOKEN is set on the server)</small>
+        <input id="set-token" placeholder="leave blank if none">
+      </label>
+      <p class="hint">Server: <span id="server-origin"></span> — this page syncs to wherever it
+        was loaded from, so install it from the address that works away from home
+        (the Tailscale one).</p>
+    </section>
+  </main>
+
+  <script>
+    // Baked in at render time; the service worker caches the rendered page, so
+    // these travel to the mill with it.
+    const SPECIES_RATES = {{ rates | tojson }};
+    const ASSUME_KILN = {{ 'true' if assume_kiln else 'false' }};
+  </script>
+  <script src="/static/logcalc.js"></script>
+  <script src="/static/field.js"></script>
+</body>
+</html>

@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if piece else 'Add' }} piece{% endblock %}
+{% block content %}
+
+<h2>{{ 'Edit piece' if piece else 'Add a piece' }}</h2>
+
+<form method="post" enctype="multipart/form-data" class="stacked">
+
+  <label>Species
+    <input list="species-list" name="species" value="{{ piece.species if piece else '' }}" required>
+    <datalist id="species-list">
+      {% for name in presets %}<option value="{{ name }}">{% endfor %}
+    </datalist>
+  </label>
+
+  <fieldset>
+    <legend>Dimensions (inches)</legend>
+    <div class="row">
+      <label>Length
+        <input type="number" step="0.25" name="length_in" value="{{ piece.length_in if piece else '' }}" required>
+      </label>
+      <label>Width
+        <input type="number" step="0.25" name="width_in" value="{{ piece.width_in if piece else '' }}" required>
+      </label>
+      <label>Thickness
+        <input type="number" step="0.125" name="thickness_in" value="{{ piece.thickness_in if piece else 1 }}" required>
+      </label>
+    </div>
+    <label>Widest point <small>(optional, for live edge)</small>
+      <input type="number" step="0.25" name="width_max_in" value="{{ piece.width_max_in or '' if piece else '' }}">
+    </label>
+    <p class="hint">4/4 = 1", 5/4 = 1.25", 8/4 = 2". Board feet are calculated for you.</p>
+  </fieldset>
+
+  <fieldset>
+    <legend>Drying</legend>
+    <div class="row">
+      <label>Mill date
+        <input type="date" name="mill_date" value="{{ piece.mill_date or '' if piece else today }}">
+      </label>
+      <label>Moisture %
+        <input type="number" step="0.1" name="moisture_pct" value="{{ piece.moisture_pct or '' if piece else '' }}">
+      </label>
+    </div>
+    <div class="row">
+      <label>Method
+        <select name="dry_method">
+          <option value="air" {{ 'selected' if not piece or piece.dry_method != 'kiln' }}>air</option>
+          <option value="kiln" {{ 'selected' if piece and piece.dry_method == 'kiln' }}>kiln</option>
+        </select>
+      </label>
+      <label>Target MC % <small>(blank = 15 air / 8 kiln)</small>
+        <input type="number" step="0.5" name="target_mc_pct"
+               value="{{ piece.target_mc_pct or '' if piece else '' }}">
+      </label>
+    </div>
+    <p class="hint">
+      Kiln pieces are predicted from live sensor readings on the
+      <a href="{{ url_for('kiln_dashboard') }}">Kiln page</a> rather than the one-year-per-inch rule.
+      A solar kiln is a finisher — air-dry to 25% or below before loading, or it case-hardens.
+    </p>
+    <label class="checkbox">
+      <input type="checkbox" name="already_dry" {{ 'checked' if piece and piece.already_dry }}>
+      Already dry when milled <small>(standing dead — skips the drying clock)</small>
+    </label>
+  </fieldset>
+
+  <fieldset>
+    <legend>Status &amp; money</legend>
+    <div class="row">
+      <label>Status
+        <select name="status">
+          {% for s in statuses %}
+            <option value="{{ s }}" {{ 'selected' if piece and piece.status == s }}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Asking price
+        <input type="number" step="0.01" name="price_asking" value="{{ piece.price_asking or '' if piece else '' }}">
+      </label>
+    </div>
+    <div class="row">
+      <label>Sold for
+        <input type="number" step="0.01" name="price_sold" value="{{ piece.price_sold or '' if piece else '' }}">
+      </label>
+      <label>Sold date
+        <input type="date" name="sold_date" value="{{ piece.sold_date or '' if piece else '' }}">
+      </label>
+    </div>
+    <label>Buyer
+      <input name="buyer" value="{{ piece.buyer or '' if piece else '' }}">
+    </label>
+  </fieldset>
+
+  <label>Location
+    <input name="location" placeholder="e.g. barn stack 2, top row" value="{{ piece.location or '' if piece else '' }}">
+  </label>
+
+  <label>Notes <small>(these go into the listing text)</small>
+    <textarea name="notes" rows="3">{{ piece.notes or '' if piece else '' }}</textarea>
+  </label>
+
+  <label>Photos
+    <input type="file" name="photos" accept="image/*" capture="environment" multiple>
+    <small class="hint">On a phone this opens the camera. Shoot the wood wet.</small>
+  </label>
+
+  <div class="actions">
+    <button type="submit">Save</button>
+    <a class="secondary" href="{{ url_for('piece_detail', piece_id=piece.id) if piece else url_for('index') }}">Cancel</a>
+  </div>
+</form>
+
+{% endblock %}

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Lumber Inventory{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="{{ url_for('index') }}">Lumber</a>
+    <nav>
+      <a href="{{ url_for('index') }}">Stack</a>
+      <a href="{{ url_for('log_list') }}">Logs</a>
+      <a href="{{ url_for('kiln_dashboard') }}">Kiln</a>
+      <a href="{{ url_for('listings_page') }}">Listings</a>
+      <a href="{{ url_for('stats') }}">Sold</a>
+      <a href="{{ url_for('settings_page') }}">Settings</a>
+      <a href="{{ url_for('field_page') }}">Field</a>
+      <a class="btn-add" href="{{ url_for('new_piece') }}">+ Add</a>
+    </nav>
+  </header>
+
+  <main>
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        {% for message in messages %}<p class="flash">{{ message }}</p>{% endfor %}
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Listings{% endblock %}
+
+{% block content %}
+<h2>Listings</h2>
+<p class="hint">
+  Marketplace has no API for sellers, so posting is: copy the pack from the board's page, paste,
+  pick photos. Everything around that lives here; the playbook is LISTING.md in the repo.
+</p>
+
+<div class="totals">
+  <div><strong>{{ listed | length }}</strong><span>up for sale</span></div>
+  <div><strong class="{{ 'bad' if listed | selectattr('stale') | list else '' }}">{{ listed | selectattr('stale') | list | length }}</strong><span>need renewing</span></div>
+  <div><strong>{{ ready | length }}</strong><span>ready to list</span></div>
+  <div><strong>{{ drying | length }}</strong><span>still drying</span></div>
+</div>
+
+<h3>Up for sale</h3>
+{% if listed %}
+  <ul class="piece-list">
+    {% for p in listed %}
+      <li>
+        <a href="{{ url_for('piece_detail', piece_id=p.id) }}">{{ p.species }} — {{ p.dimensions }}</a>
+        <span class="hint">
+          {{ p.price_asking | money }} &middot; {{ p.listed_on or '?' }}
+          {% if p.listing_url %}&middot; <a href="{{ p.listing_url }}" target="_blank" rel="noopener">open listing</a>{% endif %}
+          &middot; up {{ p.days_listed }} d
+          {% if p.stale %}&middot; <span class="bad">renewed {{ p.days_since_bump }} d ago — bump it</span>
+          {% else %}&middot; renewed {{ p.days_since_bump }} d ago{% endif %}
+        </span>
+        <div class="row-actions">
+          <form method="post" action="{{ url_for('bump_listing', piece_id=p.id) }}">
+            <button class="btn-quiet" type="submit">renewed</button>
+          </form>
+          <form method="post" action="{{ url_for('mark_sold', piece_id=p.id) }}" class="inline-form compact">
+            <input name="price_sold" type="number" step="1" placeholder="sold $" value="{{ p.price_asking or '' }}">
+            <input name="buyer" placeholder="buyer">
+            <button type="submit">sold</button>
+          </form>
+          <form method="post" action="{{ url_for('unlist_piece', piece_id=p.id) }}">
+            <button class="link-danger" type="submit">take down</button>
+          </form>
+        </div>
+      </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <p class="hint">Nothing listed yet.</p>
+{% endif %}
+
+<h3>Ready to list</h3>
+{% if ready %}
+  <ul class="piece-list">
+    {% for p in ready %}
+      <li>
+        <a href="{{ url_for('piece_detail', piece_id=p.id) }}">{{ p.species }} — {{ p.dimensions }}</a>
+        <span class="hint">{{ p.price_asking | money }} &middot; {{ p.photo_count }} photo(s) &middot; {{ p.dry_label }}</span>
+        {% for w in p.readiness.warnings %}<span class="hint">&#9888; {{ w }}</span>{% endfor %}
+        <form method="post" action="{{ url_for('mark_listed', piece_id=p.id) }}" class="inline-form compact">
+          <select name="listed_on">
+            {% for pl in platforms %}<option value="{{ pl }}">{{ pl }}</option>{% endfor %}
+          </select>
+          <input name="listing_url" placeholder="paste the listing link (optional)">
+          <button type="submit">mark listed</button>
+        </form>
+      </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <p class="hint">Nothing dry with a photo and a price. Dry boards missing one of those are below.</p>
+{% endif %}
+
+{% if blocked %}
+<h3>Dry, but not listable yet</h3>
+<ul class="piece-list">
+  {% for p in blocked %}
+    <li>
+      <a href="{{ url_for('piece_detail', piece_id=p.id) }}">{{ p.species }} — {{ p.dimensions }}</a>
+      {% for b in p.readiness.blockers %}<span class="hint bad">&#10007; {{ b }}</span>{% endfor %}
+    </li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+<h3>Still drying</h3>
+{% if drying %}
+  <ul class="piece-list">
+    {% for p in drying %}
+      <li>
+        <a href="{{ url_for('piece_detail', piece_id=p.id) }}">{{ p.species }} — {{ p.dimensions }}</a>
+        <span class="hint">{{ p.dry_label }}{% if p.ready_date %} &middot; est. {{ p.ready_date }}{% endif %} &middot; {{ p.photo_count }} photo(s)</span>
+      </li>
+    {% endfor %}
+  </ul>
+  <p class="hint">Green wood is never listable here on purpose. Photograph it wet now anyway — the
+    photos are ready the day the wood is.</p>
+{% else %}
+  <p class="hint">Nothing drying.</p>
+{% endif %}
+{% endblock %}

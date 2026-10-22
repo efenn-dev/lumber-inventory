@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}{{ piece.species }} — {{ piece.dimensions }}{% endblock %}
+{% block content %}
+
+<div class="detail-head">
+  <h2>{{ piece.species }}</h2>
+  <a class="secondary" href="{{ url_for('edit_piece', piece_id=piece.id) }}">Edit</a>
+</div>
+
+<p class="dims big">{{ piece.dimensions }}</p>
+
+<section class="facts">
+  <div><span>Board feet</span><strong>{{ piece.board_feet }}</strong></div>
+  <div><span>Status</span><strong>{{ piece.status }}</strong></div>
+  <div><span>Drying</span><strong class="{{ 'bad' if piece.unreachable }}">{{ piece.dry_label }}</strong></div>
+  <div><span>Method</span><strong>{{ piece.dry_method }} &rarr; {{ piece.target_mc_pct }}%</strong></div>
+  {% if piece.current_mc is not none %}
+    <div><span>Est. MC now</span><strong>{{ piece.current_mc }}%</strong></div>
+  {% endif %}
+  {% if piece.ready_date %}
+    <div><span>Est. ready</span><strong>{{ piece.ready_date }}</strong></div>
+  {% endif %}
+  {% if piece.moisture_pct is not none %}
+    <div><span>Moisture</span><strong>{{ piece.moisture_pct }}%</strong></div>
+  {% endif %}
+  {% if piece.location %}
+    <div><span>Location</span><strong>{{ piece.location }}</strong></div>
+  {% endif %}
+  {% if piece.price_asking %}
+    <div><span>Asking</span><strong>{{ piece.price_asking | money }}</strong></div>
+  {% endif %}
+  {% if piece.price_sold %}
+    <div><span>Sold for</span><strong>{{ piece.price_sold | money }}</strong></div>
+  {% endif %}
+</section>
+
+{% if piece.unreachable %}
+  <p class="alert alert-danger">
+    {{ piece.dry_label }} — current kiln conditions equilibrate above the {{ piece.target_mc_pct }}%
+    target, so this piece will not get there no matter how long it sits.
+    <a href="{{ url_for('kiln_dashboard') }}">Check the kiln.</a>
+  </p>
+{% elif not piece.already_dry and piece.ready_date %}
+  <div class="bar"><div class="bar-fill" style="width: {{ piece.dry_pct }}%"></div></div>
+  <p class="hint">
+    {{ piece.dry_pct }}% of the way from green to {{ piece.target_mc_pct }}%
+    {%- if piece.dry_method == 'kiln' %}, predicted from live kiln conditions
+    {%- else %}, on the one-year-per-inch rule{% endif %}.
+  </p>
+{% endif %}
+
+{% if piece.suggested_price and not piece.price_asking %}
+  <p class="hint">
+    Suggested asking price <strong>{{ piece.suggested_price | money }}</strong>
+    &mdash; {{ piece.board_feet }} bd ft at the {{ piece.species }} preset rate, discounted for
+    condition. <a href="{{ url_for('edit_piece', piece_id=piece.id) }}">Set it</a>.
+  </p>
+{% endif %}
+
+<div class="status-buttons">
+  {% for s in statuses %}
+    <form method="post" action="{{ url_for('set_status', piece_id=piece.id, new_status=s) }}">
+      <button class="chip {{ 'on' if piece.status == s }}" type="submit">{{ s }}</button>
+    </form>
+  {% endfor %}
+</div>
+
+{% if piece.notes %}
+  <section class="notes"><h3>Notes</h3><p>{{ piece.notes }}</p></section>
+{% endif %}
+
+<section>
+  <h3>Photos</h3>
+  {% if photos %}
+    <ul class="gallery">
+      {% for photo in photos %}
+        <li>
+          <img src="{{ url_for('static', filename='uploads/' ~ photo.filename) }}" alt="">
+          <form method="post" action="{{ url_for('delete_photo', photo_id=photo.id) }}">
+            <button class="link-danger" type="submit">remove</button>
+          </form>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="hint">No photos yet — <a href="{{ url_for('edit_piece', piece_id=piece.id) }}">add some</a>.</p>
+  {% endif %}
+</section>
+
+<section>
+  <h3>Listing</h3>
+  {% if piece.status == 'listed' %}
+    <p class="alert {{ 'alert-warn' if days_since_bump is not none and days_since_bump >= stale_days else 'alert-ok' }}">
+      Up on {{ piece.listed_on or '?' }} for {{ days_listed }} day(s)
+      {%- if piece.listing_url %} — <a href="{{ piece.listing_url }}" target="_blank" rel="noopener">open listing</a>{% endif %}.
+      {% if days_since_bump is not none and days_since_bump >= stale_days %}
+        Last renewed {{ days_since_bump }} days ago — Marketplace has buried it; renew and click below.
+      {% endif %}
+    </p>
+    <div class="row-actions">
+      <form method="post" action="{{ url_for('bump_listing', piece_id=piece.id) }}">
+        <button class="btn-quiet" type="submit">I renewed it</button>
+      </form>
+      <form method="post" action="{{ url_for('mark_sold', piece_id=piece.id) }}" class="inline-form compact">
+        <input name="price_sold" type="number" step="1" placeholder="sold for $" value="{{ piece.price_asking or '' }}">
+        <input name="buyer" placeholder="buyer">
+        <button type="submit">Mark sold</button>
+      </form>
+      <form method="post" action="{{ url_for('unlist_piece', piece_id=piece.id) }}">
+        <button class="link-danger" type="submit">take down</button>
+      </form>
+    </div>
+  {% elif readiness.ok %}
+    <p class="alert alert-ok">Ready to list. Copy the pack below, post it, then record where it went up.</p>
+    <form method="post" action="{{ url_for('mark_listed', piece_id=piece.id) }}" class="inline-form">
+      <select name="listed_on">
+        {% for pl in platforms %}<option value="{{ pl }}">{{ pl }}</option>{% endfor %}
+      </select>
+      <input name="listing_url" placeholder="paste the listing link (optional)">
+      <button type="submit">Mark listed</button>
+    </form>
+  {% else %}
+    {% for b in readiness.blockers %}<p class="alert alert-danger">{{ b }}</p>{% endfor %}
+  {% endif %}
+  {% for w in readiness.warnings %}<p class="alert alert-info">{{ w }}</p>{% endfor %}
+
+  <textarea id="listing" rows="18" readonly>{{ listing }}</textarea>
+  <button type="button" onclick="copyListing()">Copy listing pack</button>
+  <span id="copied" class="copied"></span>
+  <p class="hint">Title is the first line. Photos: use the ones on this page, or the originals still in your camera roll.</p>
+</section>
+
+<form class="danger-zone" method="post" action="{{ url_for('delete_piece', piece_id=piece.id) }}"
+      onsubmit="return confirm('Delete this piece and its photos?')">
+  <button class="link-danger" type="submit">Delete this piece</button>
+</form>
+
+<script>
+function copyListing() {
+  const box = document.getElementById('listing');
+  box.select();
+  navigator.clipboard.writeText(box.value).then(() => {
+    document.getElementById('copied').textContent = 'copied';
+    setTimeout(() => { document.getElementById('copied').textContent = ''; }, 2000);
+  });
+}
+</script>
+
+{% endblock %}

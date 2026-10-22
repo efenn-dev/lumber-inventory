@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Logs{% endblock %}
+
+{% block content %}
+<div class="detail-head">
+  <h2>Logs</h2>
+  <a class="btn-add" href="{{ url_for('new_log') }}">+ Add log</a>
+</div>
+
+<div class="totals">
+  <div><strong>{{ totals.count }}</strong><span>on deck</span></div>
+  <div><strong>{{ totals.intl_bf }}</strong><span>bd ft (International scale)</span></div>
+</div>
+
+{% if logs %}
+  <ul class="piece-list log-list">
+    {% for log in logs %}
+      <li class="{{ 'dimmed' if log.status != 'on_deck' }}">
+        {% if thumbs.get(log.id) %}
+          <img class="log-thumb" src="{{ url_for('static', filename='uploads/' ~ thumbs[log.id]) }}" alt="">
+        {% endif %}
+        <div class="log-row-body">
+          <a href="{{ url_for('log_detail', log_id=log.id) }}">
+            {{ log.species or 'Unidentified' }}
+            {% if log.small_diameter_in %}&mdash; {{ log.small_diameter_in }}" &times; {{ log.length_ft }}'{% endif %}
+          </a>
+          <span class="hint">
+            {{ log.status.replace('_', ' ') }}
+            {% if log.intl %}&middot; Doyle {{ log.doyle }} / Intl {{ log.intl }} bf{% endif %}
+            {% if log.location %}&middot; {{ log.location }}{% endif %}
+            {% if log.ai %}&middot; AI: {{ log.ai.species_candidates[0].name if log.ai.species_candidates else 'analyzed' }}{% endif %}
+          </span>
+        </div>
+      </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <p class="empty">No logs yet. <a href="{{ url_for('new_log') }}">Add the first one</a> —
+    or capture them at the mill with <a href="{{ url_for('field_page') }}">Field mode</a>.</p>
+{% endif %}
+{% endblock %}

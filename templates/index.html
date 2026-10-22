@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="totals">
+  <div><strong>{{ totals.count }}</strong><span>pieces on hand</span></div>
+  <div><strong>{{ totals.board_feet }}</strong><span>board feet</span></div>
+  <div><strong>{{ totals.asking | money }}</strong><span>asking value</span></div>
+</section>
+
+<form class="filters" method="get">
+  <select name="status" onchange="this.form.submit()">
+    <option value="">All statuses</option>
+    {% for s in statuses %}
+      <option value="{{ s }}" {{ 'selected' if cur_status == s }}>{{ s }}</option>
+    {% endfor %}
+  </select>
+  <select name="species" onchange="this.form.submit()">
+    <option value="">All species</option>
+    {% for s in known_species %}
+      <option value="{{ s }}" {{ 'selected' if cur_species == s }}>{{ s }}</option>
+    {% endfor %}
+  </select>
+  {% if cur_status or cur_species %}
+    <a class="clear" href="{{ url_for('index') }}">clear</a>
+  {% endif %}
+</form>
+
+{% if not pieces %}
+  <p class="empty">Nothing here yet. <a href="{{ url_for('new_piece') }}">Add your first piece.</a></p>
+{% endif %}
+
+<ul class="cards">
+  {% for piece in pieces %}
+    <li class="card status-{{ piece.status }}">
+      <a class="card-link" href="{{ url_for('piece_detail', piece_id=piece.id) }}">
+        <div class="thumb">
+          {% if thumbs.get(piece.id) %}
+            <img src="{{ url_for('static', filename='uploads/' ~ thumbs[piece.id]) }}" alt="">
+          {% else %}
+            <span class="no-photo">no photo</span>
+          {% endif %}
+        </div>
+        <div class="card-body">
+          <h3>{{ piece.species }}</h3>
+          <p class="dims">{{ piece.dimensions }}</p>
+          <p class="meta">
+            {{ piece.board_feet }} bd ft
+            {% if piece.location %} · {{ piece.location }}{% endif %}
+          </p>
+          <p class="meta">
+            <span class="pill">{{ piece.status }}</span>
+            <span class="dry">{{ piece.dry_label }}</span>
+          </p>
+          {% if piece.status == 'sold' %}
+            <p class="price sold">sold {{ piece.price_sold | money }}</p>
+          {% elif piece.price_asking %}
+            <p class="price">{{ piece.price_asking | money }}
+              {% if piece.price_per_bf %}<small>{{ piece.price_per_bf }}/bd ft</small>{% endif %}
+            </p>
+          {% endif %}
+        </div>
+      </a>
+    </li>
+  {% endfor %}
+</ul>
+
+{% endblock %}

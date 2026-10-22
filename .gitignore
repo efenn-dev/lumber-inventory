@@ -1,0 +1,20 @@
+lumber.db
+lumber.db-journal
+static/uploads/*
+!static/uploads/.gitkeep
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# personal planning docs and local artifacts: never part of the public app
+LAND_RESEARCH.md
+OUTREACH.md
+LISTING.md
+HARDWARE.md
+CUT_LIST.md
+land-maps/
+dist/
+sample-page-preview.html
+.claude/
+.pytest_cache/

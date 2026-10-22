@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+<h2>Settings</h2>
+
+<p class="hint">
+  These ship as guesses back-calculated from trade rules of thumb, not measured on
+  <em>your</em> kiln with <em>your</em> stacking and <em>your</em> fan. Replace them once a real
+  charge has been logged. Leave a field blank to fall back to the shipped default &mdash; the
+  default is shown as the placeholder.
+</p>
+
+<form method="post">
+  <h3>Drying model</h3>
+  <table class="settings">
+    <tbody>
+      {% for spec in specs %}
+        <tr>
+          <th>
+            {{ spec.label }}
+            <small>{{ spec.help }}</small>
+          </th>
+          <td>
+            <input type="number" step="0.1" name="{{ spec.key }}"
+                   value="{{ stored.get(spec.key, '') }}"
+                   placeholder="{{ spec.default }}">
+            <span class="unit">{{ spec.unit }}</span>
+          </td>
+          <td class="effective">
+            {% if stored.get(spec.key) %}
+              <span class="overridden">using {{ effective[spec.key] }}</span>
+            {% else %}
+              <span class="hint">default</span>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h3>Species rates</h3>
+  <p class="hint">
+    Dollars per board foot, used for the suggested asking price. The Sold report is the
+    thing that should eventually correct these.
+  </p>
+  <table class="settings">
+    <tbody>
+      {% for name, preset in presets.items() %}
+        <tr>
+          <th>{{ name }}</th>
+          <td>
+            <input type="number" step="0.5" name="{{ rate_prefix }}{{ name }}"
+                   value="{{ stored.get(rate_prefix ~ name, '') }}"
+                   placeholder="{{ preset.price_per_bf }}">
+            <span class="unit">$ / bd ft</span>
+          </td>
+          <td class="effective">
+            {% if stored.get(rate_prefix ~ name) %}
+              <span class="overridden">using ${{ rates[name] }}</span>
+            {% else %}
+              <span class="hint">default</span>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="inline-form">
+    <button type="submit">Save settings</button>
+  </div>
+</form>
+
+<form method="post" action="{{ url_for('reset_settings') }}" class="danger-zone"
+      onsubmit="return confirm('Discard every override and go back to the shipped defaults?')">
+  <button class="link-danger" type="submit">Reset everything to defaults</button>
+</form>
+{% endblock %}

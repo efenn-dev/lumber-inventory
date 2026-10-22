@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% block title %}Kiln{% endblock %}
+
+{% block content %}
+<h2>Kiln</h2>
+
+{% if alerts %}
+  <div class="alerts">
+    {% for alert in alerts %}
+      <p class="alert alert-{{ alert.level }}">{{ alert.message }}</p>
+    {% endfor %}
+  </div>
+{% else %}
+  <p class="alert alert-ok">Conditions look good. Nothing to flag.</p>
+{% endif %}
+
+<div class="totals">
+  <div>
+    <strong>{% if summary.temp_f is not none %}{{ summary.temp_f }}&deg;F{% else %}&mdash;{% endif %}</strong>
+    <span>temperature</span>
+    {% if summary.temp_min is not none %}<small>{{ summary.temp_min }}&ndash;{{ summary.temp_max }}</small>{% endif %}
+  </div>
+  <div>
+    <strong>{% if summary.rh_pct is not none %}{{ summary.rh_pct }}%{% else %}&mdash;{% endif %}</strong>
+    <span>humidity</span>
+    {% if summary.rh_min is not none %}<small>{{ summary.rh_min }}&ndash;{{ summary.rh_max }}</small>{% endif %}
+  </div>
+  <div>
+    <strong class="{% if summary.emc_pct is not none and summary.emc_pct >= target_mc_pct %}bad{% else %}good{% endif %}">
+      {% if summary.emc_pct is not none %}{{ summary.emc_pct }}%{% else %}&mdash;{% endif %}
+    </strong>
+    <span>EMC &mdash; where wood settles</span>
+    {% if summary.emc_min is not none %}<small>swings {{ summary.emc_min }}&ndash;{{ summary.emc_max }}</small>{% endif %}
+  </div>
+  <div>
+    <strong>{{ target_mc_pct }}%</strong>
+    <span>target</span>
+  </div>
+</div>
+
+<p class="hint">
+  {% if summary.count %}
+    {{ summary.count }} readings in the last 24 h. Temperature and humidity are medians;
+    EMC is the cycle average, because a 4/4 board takes weeks to respond and integrates
+    the whole day rather than tracking it.
+    {% if hours_since is not none %}Last reading {{ hours_since }} h ago.{% endif %}
+  {% else %}
+    No readings yet. Add one below, or point a device at the API.
+  {% endif %}
+</p>
+
+{% if readings|length > 1 %}
+<h3>Last 48 hours</h3>
+<div class="chart-wrap">
+  {% set w = 720 %}{% set h = 160 %}{% set pad = 4 %}
+  {% set temps = readings | map(attribute='temp_f') | select('!=', None) | list %}
+  {% set tmin = temps | min %}{% set tmax = temps | max %}
+  {% set trange = (tmax - tmin) if (tmax - tmin) > 1 else 1 %}
+  <svg viewBox="0 0 {{ w }} {{ h }}" preserveAspectRatio="none" class="chart" role="img"
+       aria-label="Temperature and humidity over the last 48 hours">
+    <polyline fill="none" stroke="var(--accent)" stroke-width="2" points="
+      {%- for r in readings %}{% if r.temp_f is not none %}
+        {{ (loop.index0 / (readings|length - 1) * (w - pad * 2) + pad) | round(1) }},{{ (h - pad - ((r.temp_f - tmin) / trange) * (h - pad * 2)) | round(1) }}
+      {% endif %}{% endfor -%}"/>
+    <polyline fill="none" stroke="#5b8db8" stroke-width="2" stroke-dasharray="3 3" points="
+      {%- for r in readings %}{% if r.rh_pct is not none %}
+        {{ (loop.index0 / (readings|length - 1) * (w - pad * 2) + pad) | round(1) }},{{ (h - pad - (r.rh_pct / 100) * (h - pad * 2)) | round(1) }}
+      {% endif %}{% endfor -%}"/>
+  </svg>
+  <p class="hint">
+    <span class="key key-temp"></span> temperature ({{ tmin }}&ndash;{{ tmax }}&deg;F)
+    <span class="key key-rh"></span> humidity (0&ndash;100%)
+  </p>
+</div>
+{% endif %}
+
+<h3>Sterilization</h3>
+<p class="{% if sterilization.sterilized %}sterile-ok{% else %}hint{% endif %}">
+  {% if sterilization.sterilized %}
+    Reached {{ sterilization.threshold_f }}&deg;F for {{ sterilization.longest_minutes }} minutes &mdash;
+    powderpost beetles are dead. Safe to sell as sterilized.
+  {% else %}
+    Longest run at {{ sterilization.threshold_f }}&deg;F is {{ sterilization.longest_minutes }} min;
+    needs {{ sterilization.required_minutes }} min to kill powderpost larvae. Pecan is high-starch and
+    a favourite target, so this matters before anything ships.
+  {% endif %}
+</p>
+
+{% if calibration %}
+<h3>Calibration</h3>
+<div class="charge-card">
+  <div>
+    <strong>Your kiln's measured time constant: {{ calibration.tau_days_per_inch }} days per inch</strong>
+    <span class="hint">
+      Fitted from {{ calibration.points }} wood-moisture readings over {{ calibration.span_days }} days.
+      Currently configured: {{ calibration.configured }}.
+      Fit quality R&sup2; = {{ calibration.r_squared }}{% if calibration.r_squared < 0.8 %}
+        &mdash; low, which usually means conditions changed mid-charge, so treat the single
+        number with suspicion{% endif %}.
+    </span>
+  </div>
+  <a class="btn-quiet" href="{{ url_for('settings_page') }}">Set it</a>
+</div>
+{% endif %}
+
+<h3>Charge</h3>
+{% if charge %}
+  <div class="charge-card">
+    <div>
+      <strong>{{ charge.name }}</strong>
+      <span class="hint">started {{ charge.started_at[:16].replace('T', ' ') }} &middot; target {{ charge.target_mc_pct }}%</span>
+      {% if charge.notes %}<p class="hint">{{ charge.notes }}</p>{% endif %}
+    </div>
+    <form method="post" action="{{ url_for('end_charge', charge_id=charge.id) }}">
+      <button class="btn-quiet" type="submit">End charge</button>
+    </form>
+  </div>
+  <form method="post" action="{{ url_for('edit_charge', charge_id=charge.id) }}" class="inline-form">
+    <input name="name" value="{{ charge.name }}" placeholder="Name">
+    <input name="target_mc_pct" type="number" step="0.5" value="{{ charge.target_mc_pct }}">
+    <input name="started_at" type="datetime-local" value="{{ charge.started_at[:16] }}">
+    <input name="notes" value="{{ charge.notes or '' }}" placeholder="Notes">
+    <button type="submit">Update charge</button>
+  </form>
+{% else %}
+  <p class="hint">No charge running.</p>
+{% endif %}
+
+<form method="post" action="{{ url_for('start_charge') }}" class="inline-form">
+  <input name="name" placeholder="Charge name (e.g. Pecan #1)">
+  <input name="target_mc_pct" type="number" step="0.5" placeholder="Target %" value="8">
+  <input name="notes" placeholder="Notes">
+  <button type="submit">Start new charge</button>
+</form>
+
+<h3>In the kiln</h3>
+{% if pieces %}
+  <ul class="piece-list">
+    {% for piece in pieces %}
+      <li>
+        <a href="{{ url_for('piece_detail', piece_id=piece.id) }}">
+          {{ piece.species }} &mdash; {{ piece.dimensions }}
+        </a>
+        <span class="hint">
+          {{ piece.board_feet }} bd ft &middot;
+          {% if piece.current_mc is not none %}~{{ piece.current_mc }}% MC &middot;{% endif %}
+          {% if piece.unreachable %}
+            <span class="bad">{{ piece.dry_label }}</span>
+          {% else %}
+            {{ piece.dry_label }}
+          {% endif %}
+        </span>
+      </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <p class="hint">Nothing marked for the kiln. Set a piece's drying method to "kiln" on its edit page.</p>
+{% endif %}
+
+<h3>Add a reading by hand</h3>
+<p class="hint">
+  Logging a wood moisture reading from a handheld meter is worth the extra ten seconds:
+  two of them in one charge lets the app fit your kiln's real drying rate.
+  <a href="{{ url_for('kiln_readings_page') }}">Edit or delete logged readings &rarr;</a>
+</p>
+<form method="post" action="{{ url_for('add_reading_form') }}" class="inline-form">
+  <input name="temp_f" type="number" step="0.1" placeholder="Temp &deg;F" required>
+  <input name="rh_pct" type="number" step="0.1" placeholder="RH %" required>
+  <input name="wood_mc_pct" type="number" step="0.1" placeholder="Wood MC % (optional)">
+  <input name="recorded_at" type="datetime-local" value="{{ now }}">
+  <button type="submit">Log it</button>
+</form>
+
+<h3>Import from the logger</h3>
+<form method="post" action="{{ url_for('import_readings') }}" enctype="multipart/form-data" class="inline-form">
+  <input type="file" name="csv" accept=".csv,.txt,text/csv" required>
+  <input name="source" placeholder="Source label" value="sd-card">
+  <button type="submit">Import CSV</button>
+</form>
+<p class="hint">
+  For the SD-card logger. Needs a temperature column, a humidity column, and a timestamp &mdash;
+  it accepts <code>temp_f</code> or <code>temp_c</code>, <code>rh_pct</code>/<code>humidity</code>,
+  and ISO, <code>MM/DD/YYYY</code>, or Unix epoch times. Re-importing the same card is safe;
+  readings already on file are skipped rather than double-counted.
+</p>
+
+<h3>Sensor API</h3>
+<p class="hint">
+  For the IoT device. <code>temp_f</code> and <code>rh_pct</code> are the only required fields, and
+  <code>recorded_at</code> defaults to now &mdash; so a board with no clock can just POST and go.
+</p>
+<pre class="api">POST http://{{ request.host }}/api/kiln/reading
+Content-Type: application/json
+{% if token_set %}X-Kiln-Token: &lt;your token&gt;
+{% endif %}
+{"temp_f": 118.4, "rh_pct": 42.1, "source": "kiln-esp32-1"}
+
+POST /api/kiln/readings    batch: {"source": "...", "readings": [...]}
+                           timestamps required; duplicates skipped
+GET  /api/kiln/status      current conditions, EMC, and alerts
+GET  /api/kiln/readings?hours=48</pre>
+<p class="hint">
+  {% if token_set %}
+    Token auth is on. The device must send <code>X-Kiln-Token</code> (or a <code>token</code> field in the body).
+  {% else %}
+    No token set, so anything on your wifi can write readings. Set <code>LUMBER_KILN_TOKEN</code>
+    in the environment to lock it down &mdash; the app binds 0.0.0.0 so your phone can reach it.
+  {% endif %}
+</p>
+{% endblock %}
